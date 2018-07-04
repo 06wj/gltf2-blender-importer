@@ -59,9 +59,10 @@ class Material():
         if 'name' in self.json.keys():
             self.name = self.json['name']
 
-        self.pbr = Pbr(self.json, self.gltf)
-        self.pbr.read()
-        self.pbr.debug_missing()
+        if 'pbrMetallicRoughness' in self.json:
+            self.pbr = Pbr(self.json, self.gltf)
+            self.pbr.read()
+            self.pbr.debug_missing()
 
     def use_vertex_color(self):
         if hasattr(self, 'KHR_materials_pbrSpecularGlossiness'):
@@ -80,7 +81,7 @@ class Material():
 
         if hasattr(self, 'KHR_materials_pbrSpecularGlossiness'):
             self.KHR_materials_pbrSpecularGlossiness.create_blender(mat.name)
-        else:
+        elif hasattr(self, 'pbr'):
             # create pbr material
             self.pbr.create_blender(mat.name)
 
