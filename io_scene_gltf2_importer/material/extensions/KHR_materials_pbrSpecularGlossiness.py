@@ -22,6 +22,7 @@
  """
 
 from ..texture import *
+from ..pbrNode import *
 import bpy
 
 class KHR_materials_pbrSpecularGlossiness():
@@ -31,57 +32,96 @@ class KHR_materials_pbrSpecularGlossiness():
     TEXTURE_FACTOR = 3
 
     def __init__(self, json, gltf):
-        self.json = json # KHR_materials_pbrSpecularGlossiness json
+        self.json = json # material json
+        self.pbrJson = json['extensions']['KHR_materials_pbrSpecularGlossiness'] # KHR_materials_pbrSpecularGlossiness json
         self.gltf = gltf # Reference to global glTF instance
 
         self.diffuse_type   = self.SIMPLE
         self.specgloss_type = self.SIMPLE
         self.vertex_color   = False
 
-        # Default Values
+        # pbrSpecularGlossiness values
+        self.diffuseTexture = None
         self.diffuseFactor    = [1.0,1.0,1.0,1.0]
+        self.specularGlossinessTexture = None
         self.glossinessFactor = 1.0
-        self.specularFactor   = [1.0,1.0,1.0]
+        self.specularFactor   = [1.0,1.0,1.0,1.0]
+
+        # pbr common values
+        self.emissiveFactor = [0,0,0,1]
+        self.emissiveTexture = None
+        self.occlusionTexture = None
+        self.normalTexture = None
+        self.doubleSided = False
+        self.alphaMode = 'OPAQUE'
+        self.alphaCutoff = 0.5
+
+        self.nodeX = 200
 
     def read(self):
+        json = self.json
+        pbrJson = self.pbrJson
+
         if self.json is None:
             return # will use default values
 
-        if 'diffuseTexture' in self.json.keys():
+        # read pbrSpecularGlossiness values
+        pbrKeys = pbrJson.keys()
+        if 'diffuseTexture' in pbrKeys:
             self.diffuse_type = self.TEXTURE
-            self.diffuseTexture = Texture(self.json['diffuseTexture']['index'], self.gltf.json['textures'][self.json['diffuseTexture']['index']], self.gltf)
-            self.diffuseTexture.read()
-            self.diffuseTexture.debug_missing()
+            self.diffuseTexture = self.readTexture('diffuseTexture', True)
 
-            if 'texCoord' in self.json['diffuseTexture']:
-                self.diffuseTexture.texcoord = int(self.json['diffuseTexture']['texCoord'])
-            else:
-                self.diffuseTexture.texcoord = 0
+        if 'diffuseFactor' in pbrKeys:
+            self.diffuseFactor = pbrJson['diffuseFactor']
 
-        if 'diffuseFactor' in self.json.keys():
-            self.diffuseFactor = self.json['diffuseFactor']
-            if self.diffuse_type == self.TEXTURE and self.diffuseFactor != [1.0,1.0,1.0,1.0]:
-                self.diffuse_type = self.TEXTURE_FACTOR
-
-        if 'specularGlossinessTexture' in self.json.keys():
+        if 'specularGlossinessTexture' in pbrKeys:
             self.specgloss_type = self.TEXTURE
-            self.specularGlossinessTexture = Texture(self.json['specularGlossinessTexture']['index'], self.gltf.json['textures'][self.json['specularGlossinessTexture']['index']], self.gltf)
-            self.specularGlossinessTexture.read()
-            self.specularGlossinessTexture.debug_missing()
+            self.specularGlossinessTexture = self.readTexture('specularGlossinessTexture', True)
 
-            if 'texCoord' in self.json['specularGlossinessTexture']:
-                self.specularGlossinessTexture.texcoord = int(self.json['specularGlossinessTexture']['texCoord'])
-            else:
-                self.specularGlossinessTexture.texcoord = 0
+        if 'glossinessFactor' in pbrKeys:
+            self.glossinessFactor = pbrJson['glossinessFactor']
 
-        if 'glossinessFactor' in self.json.keys():
-            self.glossinessFactor = self.json['glossinessFactor']
+        if 'specularFactor' in pbrKeys:
+            self.specularFactor = pbrJson['specularFactor']
+            if len(self.specularFactor) == 3:
+                self.specularFactor.append(1)
 
-        if 'specularFactor' in self.json.keys():
-            self.specularFactor = self.json['specularFactor']
-            if self.specgloss_type == self.TEXTURE and self.specgloss_type != [1.0,1.0,1.0]:
-                self.specgloss_type = self.TEXTURE_FACTOR
+        # read common values
+        keys = json.keys()
+        if 'emissiveTexture' in keys:
+            self.emissiveTexture = self.readTexture('emissiveTexture')
 
+        if 'normalTexture' in keys:
+            self.normalTexture = self.readTexture('normalTexture')
+
+        if 'occlusionTexture' in keys:
+            self.occlusionTexture = self.readTexture('occlusionTexture')
+
+        if 'emissiveFactor' in keys:
+            self.emissiveFactor = json['emissiveFactor']
+            if len(self.emissiveFactor) == 3:
+                self.emissiveFactor.append(1)
+
+        if 'doubleSided' in keys:
+            self.doubleSided = json['doubleSided']
+
+        if 'alphaMode' in keys:
+            self.alphaMode = json['alphaMode']
+
+        if 'alphaCutoff' in keys:
+            self.alphaCutoff = json['alphaCutoff']
+
+    def readTexture(self, textureName, isPbrJson = False):
+        textureInfo = self.pbrJson[textureName] if isPbrJson else self.json[textureName]
+        texture = Texture(textureInfo['index'], self.gltf.json['textures'][textureInfo['index']], self.gltf)
+        texture.read()
+        texture.debug_missing()
+
+        if 'texCoord' in textureInfo:
+            texture.texcoord = int(textureInfo['texCoord'])
+        else:
+            texture.texcoord = 0
+        return texture
 
     def use_vertex_color(self):
         self.vertex_color = True
@@ -93,7 +133,32 @@ class KHR_materials_pbrSpecularGlossiness():
         else:
             pass #TODO for internal / Eevee in future 2.8
 
+    def createTextureNode(self, texture, nodeTree):
+        texture.blender_create()
+        textureNode = nodeTree.nodes.new('ShaderNodeTexImage')
+        textureNode.image = bpy.data.images[texture.image.blender_image_name]
+        mappingNode = nodeTree.nodes.new('ShaderNodeMapping')
+        uvmapNode = nodeTree.nodes.new('ShaderNodeUVMap')
+        uvmapNode["gltf2_texcoord"] = texture.texcoord # Set custom flag to retrieve TexCoord
+        nodeTree.links.new(mappingNode.inputs[0], uvmapNode.outputs[0])
+        nodeTree.links.new(textureNode.inputs[0], mappingNode.outputs[0])
+
+        x = self.nodeX
+        y = 0
+        textureNode.location = x, y
+        y -= 280
+
+        mappingNode.location = x, y
+        y -= 290
+        
+        uvmapNode.location = x, y
+
+        self.nodeX += 400
+        return textureNode
+
     def create_blender_cycles(self, mat_name):
+        importGlTFSpecularGlossinessNode()
+
         material = bpy.data.materials[mat_name]
         material.use_nodes = True
         node_tree = material.node_tree
@@ -104,268 +169,57 @@ class KHR_materials_pbrSpecularGlossiness():
                 node_tree.nodes.remove(node)
 
         output_node = node_tree.nodes[0]
-        output_node.location = 1000,0
-
-        # create PBR node
-        diffuse    = node_tree.nodes.new('ShaderNodeBsdfDiffuse')
-        diffuse.location = 0,0
-        glossy     = node_tree.nodes.new('ShaderNodeBsdfGlossy')
-        glossy.location  = 0,100
-        mix        = node_tree.nodes.new('ShaderNodeMixShader')
-        mix.location     = 500,0
-
-        glossy.inputs[1].default_value = 1 - self.glossinessFactor
-
-        if self.diffuse_type == self.SIMPLE:
-            if not self.vertex_color:
-                # change input values
-                diffuse.inputs[0].default_value = self.diffuseFactor
-
-            else:
-                # Create attribute node to get COLOR_0 data
-                attribute_node = node_tree.nodes.new('ShaderNodeAttribute')
-                attribute_node.attribute_name = 'COLOR_0'
-                attribute_node.location = -500,0
-
-                # links
-                node_tree.links.new(diffuse.inputs[0], attribute_node.outputs[1])
-
-        elif self.diffuse_type == self.TEXTURE_FACTOR:
-
-            #TODO alpha ?
-            if self.vertex_color:
-                # TODO tree locations
-                # Create attribute / separate / math nodes
-                attribute_node = node_tree.nodes.new('ShaderNodeAttribute')
-                attribute_node.attribute_name = 'COLOR_0'
-
-                separate_vertex_color = node_tree.nodes.new('ShaderNodeSeparateRGB')
-                math_vc_R = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_R.operation = 'MULTIPLY'
-
-                math_vc_G = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_G.operation = 'MULTIPLY'
-
-                math_vc_B = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_B.operation = 'MULTIPLY'
-
-            self.diffuseTexture.blender_create()
-
-            # create UV Map / Mapping / Texture nodes / separate & math and combine
-            text_node = node_tree.nodes.new('ShaderNodeTexImage')
-            text_node.image = bpy.data.images[self.diffuseTexture.image.blender_image_name]
-            text_node.location = -1000,500
-
-            combine = node_tree.nodes.new('ShaderNodeCombineRGB')
-            combine.location = -250,500
-
-            math_R  = node_tree.nodes.new('ShaderNodeMath')
-            math_R.location = -500, 750
-            math_R.operation = 'MULTIPLY'
-            math_R.inputs[1].default_value = self.diffuseFactor[0]
-
-            math_G  = node_tree.nodes.new('ShaderNodeMath')
-            math_G.location = -500, 500
-            math_G.operation = 'MULTIPLY'
-            math_G.inputs[1].default_value = self.diffuseFactor[1]
-
-            math_B  = node_tree.nodes.new('ShaderNodeMath')
-            math_B.location = -500, 250
-            math_B.operation = 'MULTIPLY'
-            math_B.inputs[1].default_value = self.diffuseFactor[2]
-
-            separate = node_tree.nodes.new('ShaderNodeSeparateRGB')
-            separate.location = -750, 500
-
-            mapping = node_tree.nodes.new('ShaderNodeMapping')
-            mapping.location = -1500, 500
-
-            uvmap = node_tree.nodes.new('ShaderNodeUVMap')
-            uvmap.location = -2000, 500
-            uvmap["gltf2_texcoord"] = self.diffuseTexture.texcoord # Set custom flag to retrieve TexCoord
-            # UV Map will be set after object/UVMap creation
-
-            # Create links
-            if self.vertex_color:
-                node_tree.links.new(separate_vertex_color.inputs[0], attribute_node.outputs[0])
-                node_tree.links.new(math_vc_R.inputs[1], separate_vertex_color.outputs[0])
-                node_tree.links.new(math_vc_G.inputs[1], separate_vertex_color.outputs[1])
-                node_tree.links.new(math_vc_B.inputs[1], separate_vertex_color.outputs[2])
-                node_tree.links.new(math_vc_R.inputs[0], math_R.outputs[0])
-                node_tree.links.new(math_vc_G.inputs[0], math_G.outputs[0])
-                node_tree.links.new(math_vc_B.inputs[0], math_B.outputs[0])
-                node_tree.links.new(combine.inputs[0], math_vc_R.outputs[0])
-                node_tree.links.new(combine.inputs[1], math_vc_G.outputs[0])
-                node_tree.links.new(combine.inputs[2], math_vc_B.outputs[0])
-
-            else:
-                node_tree.links.new(combine.inputs[0], math_R.outputs[0])
-                node_tree.links.new(combine.inputs[1], math_G.outputs[0])
-                node_tree.links.new(combine.inputs[2], math_B.outputs[0])
-
-            # Common for both mode (non vertex color / vertex color)
-            node_tree.links.new(math_R.inputs[0], separate.outputs[0])
-            node_tree.links.new(math_G.inputs[0], separate.outputs[1])
-            node_tree.links.new(math_B.inputs[0], separate.outputs[2])
-
-            node_tree.links.new(mapping.inputs[0], uvmap.outputs[0])
-            node_tree.links.new(text_node.inputs[0], mapping.outputs[0])
-            node_tree.links.new(separate.inputs[0], text_node.outputs[0])
-
-
-            node_tree.links.new(diffuse.inputs[0], combine.outputs[0])
-
-        elif self.diffuse_type == self.TEXTURE:
-
-            self.diffuseTexture.blender_create()
-
-            #TODO alpha ?
-            if self.vertex_color:
-                # Create attribute / separate / math nodes
-                attribute_node = node_tree.nodes.new('ShaderNodeAttribute')
-                attribute_node.attribute_name = 'COLOR_0'
-                attribute_node.location = -2000,250
-
-                separate_vertex_color = node_tree.nodes.new('ShaderNodeSeparateRGB')
-                separate_vertex_color.location = -1500, 250
-
-                math_vc_R = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_R.operation = 'MULTIPLY'
-                math_vc_R.location = -1000,750
-
-                math_vc_G = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_G.operation = 'MULTIPLY'
-                math_vc_G.location = -1000,500
-
-                math_vc_B = node_tree.nodes.new('ShaderNodeMath')
-                math_vc_B.operation = 'MULTIPLY'
-                math_vc_B.location = -1000,250
-
-
-                combine = node_tree.nodes.new('ShaderNodeCombineRGB')
-                combine.location = -500,500
-
-                separate = node_tree.nodes.new('ShaderNodeSeparateRGB')
-                separate.location = -1500, 500
-
-            # create UV Map / Mapping / Texture nodes / separate & math and combine
-            text_node = node_tree.nodes.new('ShaderNodeTexImage')
-            text_node.image = bpy.data.images[self.diffuseTexture.image.blender_image_name]
-            if self.vertex_color:
-                text_node.location = -2000,500
-            else:
-                text_node.location = -500,500
-
-            mapping = node_tree.nodes.new('ShaderNodeMapping')
-            if self.vertex_color:
-                mapping.location = -2500,500
-            else:
-                mapping.location = -1500,500
-
-            uvmap = node_tree.nodes.new('ShaderNodeUVMap')
-            if self.vertex_color:
-                uvmap.location = -3000,500
-            else:
-                uvmap.location = -2000,500
-            uvmap["gltf2_texcoord"] = self.diffuseTexture.texcoord # Set custom flag to retrieve TexCoord
-            # UV Map will be set after object/UVMap creation
-
-            # Create links
-            if self.vertex_color:
-                node_tree.links.new(separate_vertex_color.inputs[0], attribute_node.outputs[0])
-
-                node_tree.links.new(math_vc_R.inputs[1], separate_vertex_color.outputs[0])
-                node_tree.links.new(math_vc_G.inputs[1], separate_vertex_color.outputs[1])
-                node_tree.links.new(math_vc_B.inputs[1], separate_vertex_color.outputs[2])
-
-                node_tree.links.new(combine.inputs[0], math_vc_R.outputs[0])
-                node_tree.links.new(combine.inputs[1], math_vc_G.outputs[0])
-                node_tree.links.new(combine.inputs[2], math_vc_B.outputs[0])
-
-                node_tree.links.new(separate.inputs[0], text_node.outputs[0])
-
-                node_tree.links.new(principled.inputs[0], combine.outputs[0])
-
-                node_tree.links.new(math_vc_R.inputs[0], separate.outputs[0])
-                node_tree.links.new(math_vc_G.inputs[0], separate.outputs[1])
-                node_tree.links.new(math_vc_B.inputs[0], separate.outputs[2])
-
-            else:
-                node_tree.links.new(diffuse.inputs[0], text_node.outputs[0])
-
-            # Common for both mode (non vertex color / vertex color)
-
-            node_tree.links.new(mapping.inputs[0], uvmap.outputs[0])
-            node_tree.links.new(text_node.inputs[0], mapping.outputs[0])
-
-
-        if self.specgloss_type == self.SIMPLE:
-
-            combine = node_tree.nodes.new('ShaderNodeCombineRGB')
-            combine.inputs[0].default_value = self.specularFactor[0]
-            combine.inputs[1].default_value = self.specularFactor[1]
-            combine.inputs[2].default_value = self.specularFactor[2]
-
-            # links
-            node_tree.links.new(glossy.inputs[0], combine.outputs[0])
-
-        elif self.specgloss_type == self.TEXTURE:
-            self.specularGlossinessTexture.blender_create()
-            spec_text = node_tree.nodes.new('ShaderNodeTexImage')
-            spec_text.image = bpy.data.images[self.specularGlossinessTexture.image.blender_image_name]
-            spec_text.color_space = 'NONE'
-            spec_text.location = -500,0
-
-            spec_mapping = node_tree.nodes.new('ShaderNodeMapping')
-            spec_mapping.location = -1000,0
-
-            spec_uvmap = node_tree.nodes.new('ShaderNodeUVMap')
-            spec_uvmap.location = -1500,0
-            spec_uvmap["gltf2_texcoord"] = self.specularGlossinessTexture.texcoord # Set custom flag to retrieve TexCoord
-
-            # links
-            node_tree.links.new(glossy.inputs[0], spec_text.outputs[0])
-            node_tree.links.new(mix.inputs[0], spec_text.outputs[1])
-
-            node_tree.links.new(spec_mapping.inputs[0], spec_uvmap.outputs[0])
-            node_tree.links.new(spec_text.inputs[0], spec_mapping.outputs[0])
-
-        elif self.specgloss_type == self.TEXTURE_FACTOR:
-
-            self.specularGlossinessTexture.blender_create()
-
-            spec_text = node_tree.nodes.new('ShaderNodeTexImage')
-            spec_text.image = bpy.data.images[self.specularGlossinessTexture.image.blender_image_name]
-            spec_text.color_space = 'NONE'
-            spec_text.location = -1000,0
-
-            spec_math     = node_tree.nodes.new('ShaderNodeMath')
-            spec_math.operation = 'MULTIPLY'
-            spec_math.inputs[0].default_value = self.glossinessFactor
-            spec_math.location = -250,100
-
-            spec_mapping = node_tree.nodes.new('ShaderNodeMapping')
-            spec_mapping.location = -1000,0
-
-            spec_uvmap = node_tree.nodes.new('ShaderNodeUVMap')
-            spec_uvmap.location = -1500,0
-            spec_uvmap["gltf2_texcoord"] = self.specularGlossinessTexture.texcoord # Set custom flag to retrieve TexCoord
-
-
-            # links
-
-            node_tree.links.new(spec_math.inputs[1], spec_text.outputs[0])
-            node_tree.links.new(mix.inputs[0], spec_text.outputs[1])
-            node_tree.links.new(glossy.inputs[1], spec_math.outputs[0])
-            node_tree.links.new(glossy.inputs[0], spec_text.outputs[0])
-
-            node_tree.links.new(spec_mapping.inputs[0], spec_uvmap.outputs[0])
-            node_tree.links.new(spec_text.inputs[0], spec_mapping.outputs[0])
+        output_node.location = 1400, 600
+
+        # create PBR node  
+        pbrNode = node_tree.nodes.new("ShaderNodeGroup")
+        pbrNode.location = 0,0
+        pbrNode.node_tree = bpy.data.node_groups['glTF Specular Glossiness']
+        pbrNode.location = 1000, 600
+        
+        # pbrSpecularGlossiness values
+        pbrNode.inputs[1].default_value = self.diffuseFactor
+        pbrNode.inputs[4].default_value = self.specularFactor
+        pbrNode.inputs[5].default_value = self.glossinessFactor
+
+        if self.specularGlossinessTexture:
+            specularGlossinessTextureNode = self.createTextureNode(self.specularGlossinessTexture, node_tree)
+            node_tree.links.new(pbrNode.inputs[2], specularGlossinessTextureNode.outputs[0]) # specular
+            node_tree.links.new(pbrNode.inputs[3], specularGlossinessTextureNode.outputs[1]) # glossiness
+
+        if self.diffuseTexture:
+            diffuseTextureNode = self.createTextureNode(self.diffuseTexture, node_tree)
+            node_tree.links.new(pbrNode.inputs[0], diffuseTextureNode.outputs[0])
+            if self.alphaMode != 'OPAQUE':
+                node_tree.links.new(pbrNode.inputs[12], diffuseTextureNode.outputs[1])
+        
+        # common values
+        pbrNode.inputs[11].default_value = self.emissiveFactor
+        pbrNode.inputs[13].default_value = self.alphaCutoff
+        pbrNode.inputs[14].default_value = 1 if self.alphaMode == 'MASK' else 0
+        pbrNode.inputs[15].default_value = 1 if self.doubleSided else 0
+        if self.emissiveTexture:
+            emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
+            node_tree.links.new(pbrNode.inputs[10], emissiveNode.outputs[0])
+
+        if self.normalTexture:
+            normalTextureNode = self.createTextureNode(self.normalTexture, node_tree)
+            normalTextureNode.color_space = 'NONE'
+            node_tree.links.new(pbrNode.inputs[6], normalTextureNode.outputs[0])
+
+        if self.occlusionTexture:
+            occlusionTextureNode = self.createTextureNode(self.occlusionTexture, node_tree)
+            node_tree.links.new(pbrNode.inputs[8], occlusionTextureNode.outputs[0])
+
+        
+        if self.vertex_color:
+            vertexColorNode = node_tree.nodes.new('ShaderNodeAttribute')
+            vertexColorNode.attribute_name = 'COLOR_0'
+            node_tree.links.new(pbrNode.inputs[17], vertexColorNode.outputs[1])
+            pbrNode.inputs[16].default_value = 1.0
 
         # link node to output
-        node_tree.links.new(mix.inputs[2], diffuse.outputs[0])
-        node_tree.links.new(mix.inputs[1], glossy.outputs[0])
-        node_tree.links.new(output_node.inputs[0], mix.outputs[0])
+        node_tree.links.new(output_node.inputs[0], pbrNode.outputs[0])
 
 
     def debug_missing(self):

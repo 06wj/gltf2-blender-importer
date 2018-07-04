@@ -51,7 +51,7 @@ class Material():
 
         if 'extensions' in self.json.keys():
             if 'KHR_materials_pbrSpecularGlossiness' in self.json['extensions'].keys():
-                self.KHR_materials_pbrSpecularGlossiness = KHR_materials_pbrSpecularGlossiness(self.json['extensions']['KHR_materials_pbrSpecularGlossiness'], self.gltf)
+                self.KHR_materials_pbrSpecularGlossiness = KHR_materials_pbrSpecularGlossiness(self.json, self.gltf)
                 self.KHR_materials_pbrSpecularGlossiness.read()
                 self.KHR_materials_pbrSpecularGlossiness.debug_missing()
 
@@ -59,35 +59,9 @@ class Material():
         if 'name' in self.json.keys():
             self.name = self.json['name']
 
-        if 'pbrMetallicRoughness' in self.json.keys():
-            self.pbr = Pbr(self.json['pbrMetallicRoughness'], self.gltf)
-        else:
-            self.pbr = Pbr(None, self.gltf)
+        self.pbr = Pbr(self.json, self.gltf)
         self.pbr.read()
         self.pbr.debug_missing()
-
-        # Emission
-        if 'emissiveTexture' in self.json.keys():
-            if 'emissiveFactor' in self.json.keys():
-                factor = self.json['emissiveFactor']
-            else:
-                factor = [1.0, 1.0, 1.0]
-
-            self.emissivemap = EmissiveMap(self.json['emissiveTexture'], factor, self.gltf)
-            self.emissivemap.read()
-            self.emissivemap.debug_missing()
-
-        # Normal Map
-        if 'normalTexture' in self.json.keys():
-            self.normalmap = NormalMap(self.json['normalTexture'], 1.0, self.gltf)
-            self.normalmap.read()
-            self.normalmap.debug_missing()
-
-        # Occlusion Map
-        if 'occlusionTexture' in self.json.keys():
-            self.occlusionmap = OcclusionMap(self.json['occlusionTexture'], 1.0, self.gltf)
-            self.occlusionmap.read()
-            self.occlusionmap.debug_missing()
 
     def use_vertex_color(self):
         if hasattr(self, 'KHR_materials_pbrSpecularGlossiness'):
@@ -109,19 +83,6 @@ class Material():
         else:
             # create pbr material
             self.pbr.create_blender(mat.name)
-
-        # add emission map if needed
-        if self.emissivemap:
-            self.emissivemap.create_blender(mat.name)
-
-        # add normal map if needed
-        if self.normalmap:
-            self.normalmap.create_blender(mat.name)
-
-        # add occlusion map if needed
-        # will be pack, but not used
-        if self.occlusionmap:
-            self.occlusionmap.create_blender(mat.name)
 
     def set_uvmap(self, prim, obj):
         node_tree = bpy.data.materials[self.blender_material].node_tree
