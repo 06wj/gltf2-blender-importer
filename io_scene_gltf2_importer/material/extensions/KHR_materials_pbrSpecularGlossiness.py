@@ -157,8 +157,6 @@ class KHR_materials_pbrSpecularGlossiness():
         return textureNode
 
     def create_blender_cycles(self, mat_name):
-        importGlTFSpecularGlossinessNode()
-
         material = bpy.data.materials[mat_name]
         material.use_nodes = True
         node_tree = material.node_tree
@@ -172,51 +170,51 @@ class KHR_materials_pbrSpecularGlossiness():
         output_node.location = 1400, 600
 
         # create PBR node  
-        pbrNode = node_tree.nodes.new("ShaderNodeGroup")
-        pbrNode.location = 0,0
-        pbrNode.node_tree = bpy.data.node_groups['glTF Specular Glossiness']
+        pbrNode = createGlTFSpecularGlossinessNode(node_tree)
         pbrNode.location = 1000, 600
+        pbrInputDict = getNodeInputDict(pbrNode)
         
         # pbrSpecularGlossiness values
-        pbrNode.inputs[1].default_value = self.diffuseFactor
-        pbrNode.inputs[4].default_value = self.specularFactor
-        pbrNode.inputs[5].default_value = self.glossinessFactor
+        pbrInputDict['DiffuseFactor'].default_value = self.diffuseFactor
+        pbrInputDict['SpecularFactor'].default_value = self.specularFactor
+        pbrInputDict['GlossinessFactor'].default_value = self.glossinessFactor
 
         if self.specularGlossinessTexture:
             specularGlossinessTextureNode = self.createTextureNode(self.specularGlossinessTexture, node_tree)
-            node_tree.links.new(pbrNode.inputs[2], specularGlossinessTextureNode.outputs[0]) # specular
-            node_tree.links.new(pbrNode.inputs[3], specularGlossinessTextureNode.outputs[1]) # glossiness
+            node_tree.links.new(pbrInputDict['Specular'], specularGlossinessTextureNode.outputs[0]) # specular
+            node_tree.links.new(pbrInputDict['Glossiness'], specularGlossinessTextureNode.outputs[1]) # glossiness
 
         if self.diffuseTexture:
             diffuseTextureNode = self.createTextureNode(self.diffuseTexture, node_tree)
-            node_tree.links.new(pbrNode.inputs[0], diffuseTextureNode.outputs[0])
+            node_tree.links.new(pbrInputDict['Diffuse'], diffuseTextureNode.outputs[0])
             if self.alphaMode != 'OPAQUE':
-                node_tree.links.new(pbrNode.inputs[12], diffuseTextureNode.outputs[1])
+                node_tree.links.new(pbrInputDict['Alpha'], diffuseTextureNode.outputs[1])
         
         # common values
-        pbrNode.inputs[11].default_value = self.emissiveFactor
-        pbrNode.inputs[13].default_value = self.alphaCutoff
-        pbrNode.inputs[14].default_value = 1 if self.alphaMode == 'MASK' else 0
-        pbrNode.inputs[15].default_value = 1 if self.doubleSided else 0
+        pbrInputDict['EmissiveFactor'].default_value = self.emissiveFactor
+        pbrInputDict['AlphaCutoff'].default_value = self.alphaCutoff
+        pbrInputDict['DoubleSided'].default_value = 1 if self.doubleSided else 0
+        pbrInputDict['AlphaMode'].default_value = 1 if self.alphaMode == 'MASK' else 0
+
         if self.emissiveTexture:
             emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
-            node_tree.links.new(pbrNode.inputs[10], emissiveNode.outputs[0])
+            node_tree.links.new(pbrInputDict['Emissive'], emissiveNode.outputs[0])
 
         if self.normalTexture:
             normalTextureNode = self.createTextureNode(self.normalTexture, node_tree)
             normalTextureNode.color_space = 'NONE'
-            node_tree.links.new(pbrNode.inputs[6], normalTextureNode.outputs[0])
+            node_tree.links.new(pbrInputDict['Normal'], normalTextureNode.outputs[0])
 
         if self.occlusionTexture:
             occlusionTextureNode = self.createTextureNode(self.occlusionTexture, node_tree)
-            node_tree.links.new(pbrNode.inputs[8], occlusionTextureNode.outputs[0])
-
-        
+            normalTextureNode.color_space = 'NONE'
+            node_tree.links.new(pbrInputDict['Occlusion'], occlusionTextureNode.outputs[0])
+       
         if self.vertex_color:
             vertexColorNode = node_tree.nodes.new('ShaderNodeAttribute')
             vertexColorNode.attribute_name = 'COLOR_0'
-            node_tree.links.new(pbrNode.inputs[17], vertexColorNode.outputs[1])
-            pbrNode.inputs[16].default_value = 1.0
+            node_tree.links.new(pbrInputDict['COLOR_0'], vertexColorNode.outputs[1])
+            pbrInputDict['Use COLOR_0'].default_value = 1.0
 
         # link node to output
         node_tree.links.new(output_node.inputs[0], pbrNode.outputs[0])
