@@ -219,26 +219,22 @@ class KHR_materials_pbrSpecularGlossiness():
         pbrInputDict['SpecularFactor'].default_value = self.specularFactor
         pbrInputDict['GlossinessFactor'].default_value = self.glossinessFactor
 
-        if self.specularGlossinessTexture:
-            specularGlossinessTextureNode = self.createTextureNode(self.specularGlossinessTexture, node_tree)
-            node_tree.links.new(pbrInputDict['Specular'], specularGlossinessTextureNode.outputs[0]) # specular
-            node_tree.links.new(pbrInputDict['Glossiness'], specularGlossinessTextureNode.outputs[1]) # glossiness
-
         if self.diffuseTexture:
             diffuseTextureNode = self.createTextureNode(self.diffuseTexture, node_tree)
             node_tree.links.new(pbrInputDict['Diffuse'], diffuseTextureNode.outputs[0])
             if self.alphaMode != 'OPAQUE':
                 node_tree.links.new(pbrInputDict['Alpha'], diffuseTextureNode.outputs[1])
+
+        if self.specularGlossinessTexture:
+            specularGlossinessTextureNode = self.createTextureNode(self.specularGlossinessTexture, node_tree)
+            node_tree.links.new(pbrInputDict['Specular'], specularGlossinessTextureNode.outputs[0]) # specular
+            node_tree.links.new(pbrInputDict['Glossiness'], specularGlossinessTextureNode.outputs[1]) # glossiness
         
         # common values
         pbrInputDict['EmissiveFactor'].default_value = self.emissiveFactor
         pbrInputDict['AlphaCutoff'].default_value = self.alphaCutoff
-        pbrInputDict['DoubleSided'].default_value = 1 if self.doubleSided else 0
         pbrInputDict['AlphaMode'].default_value = 1 if self.alphaMode == 'MASK' else 0
-
-        if self.emissiveTexture:
-            emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
-            node_tree.links.new(pbrInputDict['Emissive'], emissiveNode.outputs[0])
+        pbrInputDict['DoubleSided'].default_value = 1 if self.doubleSided else 0
 
         if self.normalTexture:
             normalTextureNode = self.createTextureNode(self.normalTexture, node_tree)
@@ -249,7 +245,11 @@ class KHR_materials_pbrSpecularGlossiness():
             occlusionTextureNode = self.createTextureNode(self.occlusionTexture, node_tree)
             occlusionTextureNode.color_space = 'NONE'
             node_tree.links.new(pbrInputDict['Occlusion'], occlusionTextureNode.outputs[0])
-       
+
+        if self.emissiveTexture:
+            emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
+            node_tree.links.new(pbrInputDict['Emissive'], emissiveNode.outputs[0])
+        
         if self.vertex_color:
             vertexColorNode = node_tree.nodes.new('ShaderNodeAttribute')
             vertexColorNode.attribute_name = 'COLOR_0'

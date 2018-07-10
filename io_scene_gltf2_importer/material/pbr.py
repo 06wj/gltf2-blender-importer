@@ -239,12 +239,8 @@ class Pbr():
         # common values
         pbrInputDict['EmissiveFactor'].default_value = self.emissiveFactor
         pbrInputDict['AlphaCutoff'].default_value = self.alphaCutoff
-        pbrInputDict['DoubleSided'].default_value = 1 if self.doubleSided else 0
         pbrInputDict['AlphaMode'].default_value = 1 if self.alphaMode == 'MASK' else 0
-
-        if self.emissiveTexture:
-            emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
-            node_tree.links.new(pbrInputDict['Emissive'], emissiveNode.outputs[0])
+        pbrInputDict['DoubleSided'].default_value = 1 if self.doubleSided else 0
 
         if self.normalTexture:
             normalTextureNode = self.createTextureNode(self.normalTexture, node_tree)
@@ -256,6 +252,9 @@ class Pbr():
             occlusionTextureNode.color_space = 'NONE'
             node_tree.links.new(pbrInputDict['Occlusion'], occlusionTextureNode.outputs[0])
 
+        if self.emissiveTexture:
+            emissiveNode = self.createTextureNode(self.emissiveTexture, node_tree)
+            node_tree.links.new(pbrInputDict['Emissive'], emissiveNode.outputs[0])
         
         if self.vertex_color:
             vertexColorNode = node_tree.nodes.new('ShaderNodeAttribute')
