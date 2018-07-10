@@ -211,7 +211,7 @@ class Pbr():
 
         if self.occlusionTexture:
             occlusionTextureNode = self.createTextureNode(self.occlusionTexture, node_tree)
-            normalTextureNode.color_space = 'NONE'
+            occlusionTextureNode.color_space = 'NONE'
             node_tree.links.new(pbrInputDict['Occlusion'], occlusionTextureNode.outputs[0])
 
         
