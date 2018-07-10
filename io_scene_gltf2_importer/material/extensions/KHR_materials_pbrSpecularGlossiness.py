@@ -143,6 +143,46 @@ class KHR_materials_pbrSpecularGlossiness():
         nodeTree.links.new(mappingNode.inputs[0], uvmapNode.outputs[0])
         nodeTree.links.new(textureNode.inputs[0], mappingNode.outputs[0])
 
+        # set texture wrap
+        if texture.wrapS == texture.wrapT:
+            if texture.wrapS == texture.REPEAT:
+                textureNode.extension = 'REPEAT'
+            elif texture.wrapS == texture.CLAMP_TO_EDGE:
+                textureNode.extension = 'EXTEND'
+            elif texture.wrapS == MIRRORED_REPEAT:
+                # not support yet
+                textureNode.extension = 'REPEAT'
+        else:
+            textureNode.extension = 'REPEAT'
+            mappingNode.use_max = True
+            mappingNode.use_min = True
+            if texture.wrapS == texture.REPEAT:
+                mappingNode.min[0] = -1e+40
+                mappingNode.max[0] = 1e+40
+            elif texture.wrapS == texture.CLAMP_TO_EDGE:
+                mappingNode.min[0] = 0
+                mappingNode.max[0] = 1
+            elif texture.wrapS == texture.MIRRORED_REPEAT:
+                # not support yet
+                pass
+
+            if texture.wrapT == texture.REPEAT:
+                mappingNode.min[1] = -1e+40
+                mappingNode.max[1] = 1e+40
+            elif texture.wrapT == texture.CLAMP_TO_EDGE:
+                mappingNode.min[1] = 0
+                mappingNode.max[1] = 1
+            elif texture.wrapT == texture.MIRRORED_REPEAT:
+                # not support yet
+                pass
+
+        # set texture filter, only support magFilter and minFilter has same value
+        if texture.magFilter == texture.minFilter:
+            if texture.magFilter == texture.NEAREST:
+                textureNode.interpolation = 'Closest'
+            elif texture.magFilter == texture.LINEAR:
+                textureNode.interpolation = 'Linear'
+                
         x = self.nodeX
         y = 0
         textureNode.location = x, y
