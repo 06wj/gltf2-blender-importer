@@ -27,18 +27,13 @@ from .pbrNode import *
 
 class Pbr():
 
-    SIMPLE  = 1
-    TEXTURE = 2
-    TEXTURE_FACTOR = 3
-
     def __init__(self, json, gltf):
         self.json = json # material json
         self.pbrJson = json['pbrMetallicRoughness'] # pbrMetallicRoughness json
         self.gltf = gltf # Reference to global glTF instance
 
         self.vertex_color = False
-        self.color_type = None
-        self.metallic_type = None
+        self.use_texture = False
 
         # pbrMetallicRoughness values
         self.baseColorFactor = [1,1,1,1]
@@ -72,11 +67,9 @@ class Pbr():
         if pbrJson is not None:
             pbrKeys = pbrJson.keys()
             if 'baseColorTexture' in pbrKeys:
-                self.color_type = Pbr.TEXTURE
                 self.baseColorTexture = self.readTexture('baseColorTexture', True)
 
             if 'metallicRoughnessTexture' in pbrKeys:
-                self.metallic_type = Pbr.TEXTURE
                 self.metallicRoughnessTexture = self.readTexture('metallicRoughnessTexture', True)
 
             if 'baseColorFactor' in pbrKeys:
@@ -137,6 +130,8 @@ class Pbr():
             pass #TODO for internal / Eevee in future 2.8
 
     def createTextureNode(self, texture, nodeTree):
+        self.use_texture = True
+        
         texture.blender_create()
         textureNode = nodeTree.nodes.new('ShaderNodeTexImage')
         textureNode.image = bpy.data.images[texture.image.blender_image_name]

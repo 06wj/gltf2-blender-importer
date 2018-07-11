@@ -27,18 +27,13 @@ import bpy
 
 class KHR_materials_pbrSpecularGlossiness():
 
-    SIMPLE  = 1
-    TEXTURE = 2
-    TEXTURE_FACTOR = 3
-
     def __init__(self, json, gltf):
         self.json = json # material json
         self.pbrJson = json['extensions']['KHR_materials_pbrSpecularGlossiness'] # KHR_materials_pbrSpecularGlossiness json
         self.gltf = gltf # Reference to global glTF instance
 
-        self.diffuse_type   = self.SIMPLE
-        self.specgloss_type = self.SIMPLE
         self.vertex_color   = False
+        self.use_texture = False
 
         # pbrSpecularGlossiness values
         self.diffuseTexture = None
@@ -68,14 +63,12 @@ class KHR_materials_pbrSpecularGlossiness():
         # read pbrSpecularGlossiness values
         pbrKeys = pbrJson.keys()
         if 'diffuseTexture' in pbrKeys:
-            self.diffuse_type = self.TEXTURE
             self.diffuseTexture = self.readTexture('diffuseTexture', True)
 
         if 'diffuseFactor' in pbrKeys:
             self.diffuseFactor = pbrJson['diffuseFactor']
 
         if 'specularGlossinessTexture' in pbrKeys:
-            self.specgloss_type = self.TEXTURE
             self.specularGlossinessTexture = self.readTexture('specularGlossinessTexture', True)
 
         if 'glossinessFactor' in pbrKeys:
@@ -134,6 +127,8 @@ class KHR_materials_pbrSpecularGlossiness():
             pass #TODO for internal / Eevee in future 2.8
 
     def createTextureNode(self, texture, nodeTree):
+        self.use_texture = True
+        
         texture.blender_create()
         textureNode = nodeTree.nodes.new('ShaderNodeTexImage')
         textureNode.image = bpy.data.images[texture.image.blender_image_name]
