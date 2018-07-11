@@ -2,7 +2,7 @@ import bpy
 import os
 from urllib.parse import urljoin
 
-blenderDir = urljoin(os.path.abspath(__file__), './glTF2_Principled.blend/NodeTree/')
+blenderDir = urljoin(os.path.abspath(__file__), './glTF2.blend/NodeTree/')
 
 def _importGroupNode(groupName):
     if groupName not in bpy.data.node_groups:
